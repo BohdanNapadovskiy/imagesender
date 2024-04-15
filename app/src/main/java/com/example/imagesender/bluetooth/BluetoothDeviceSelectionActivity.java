@@ -1,4 +1,4 @@
-package com.example.imagesender.activity;
+package com.example.imagesender.bluetooth;
 
 import static android.content.ContentValues.TAG;
 
@@ -25,22 +25,21 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
 
 
+import com.example.imagesender.bluetooth.BluetoothConnectionManager;
 import com.example.imagesender.MainActivity;
 import com.example.imagesender.R;
+import com.example.imagesender.enums.ServiceEnum;
 
 
-import java.io.IOException;
 import java.util.ArrayList;
-import java.util.UUID;
 
 public class BluetoothDeviceSelectionActivity extends AppCompatActivity {
 
     private BluetoothAdapter mBluetoothAdapter;
     private ArrayAdapter<String> mArrayAdapter;
+    BluetoothConnectionManager connectionManager;
     private ArrayList<BluetoothDevice> mDevices = new ArrayList<>();
-    public static final int STATUS_CONNECTING = 1;
-    public static final int STATUS_CONNECTED = 2;
-    public static final int STATUS_FAILED = 3;
+
 
     private final ActivityResultLauncher<Intent> enableBluetoothLauncher = registerForActivityResult(
             new ActivityResultContracts.StartActivityForResult(),
@@ -125,10 +124,10 @@ public class BluetoothDeviceSelectionActivity extends AppCompatActivity {
     };
 
     private void connectToDevice(BluetoothDevice device) {
-        BluetoothSocket socket;
         mBluetoothAdapter.cancelDiscovery();
-        int status = discoverServicesAndCheckUUID(device);
-        String statusMessage = getStatusMessage(status);
+        connectionManager = new BluetoothConnectionManager(device, ServiceEnum.NUS_SERVICE_UUID.value);
+        int status = connectionManager.discoverServicesAndCheckUUID(device);
+        String statusMessage = connectionManager.getStatusMessage(status);
         Toast.makeText(this, "Connected to " + device.getName(), Toast.LENGTH_SHORT).show();
         Intent intent = new Intent(this, MainActivity.class);
         intent.putExtra("device_name", device.getName());
@@ -138,63 +137,16 @@ public class BluetoothDeviceSelectionActivity extends AppCompatActivity {
         finish(); // Optional: if you want to close the curren
     }
 
-    private int discoverServicesAndCheckUUID(BluetoothDevice device) {
-        BluetoothSocket socket = null;
-        UUID SERIAL_UUID = UUID.fromString("00001101-0000-1000-8000-00805f9b34fb");
-        try {
-            socket = device.createInsecureRfcommSocketToServiceRecord(SERIAL_UUID);
-        } catch (Exception e) {
-            Log.e("", "Error creating socket");
-        }
-        try {
-            socket.connect();
-            Log.e("", "Connected");
-            return STATUS_CONNECTED;
-        } catch (IOException e) {
-            Log.e("", e.getMessage());
-            return alternativeConnection(device);
-        } finally {
-            try {
-                if (socket != null) {
-                    socket.close();
-                }
-            } catch (IOException exception) {
-                Log.e(TAG, "Failed to close socket", exception);
-            }
-
-        }
-    }
 
 
-    private int alternativeConnection(BluetoothDevice device) {
-        try {
-            Log.e("", "trying fallback...");
-            BluetoothSocket socket = (BluetoothSocket) device.getClass().getMethod("createRfcommSocket", new Class[]{int.class}).invoke(device, 1);
-            socket.connect();
-            Log.e("", "Connected");
-            return STATUS_CONNECTED;
-        } catch (Exception e2) {
-            Log.e("", "Couldn't establish Bluetooth connection!");
-            return STATUS_FAILED;
-        }
 
-    }
-
-    private String getStatusMessage(int status) {
-        switch (status) {
-            case STATUS_CONNECTING:
-                return "Connecting";
-            case STATUS_CONNECTED:
-                return "Connected";
-            case STATUS_FAILED:
-                return "Failed";
-            default:
-                return "Unknown";
-        }
-    }
     @Override
     protected void onDestroy() {
         super.onDestroy();
+        // If using a connection manager instance at a broader scope, disconnect here
+        if (connectionManager != null) {
+            connectionManager.disconnect();
+        }
         if (mReceiver != null) {
             unregisterReceiver(mReceiver);
         }

@@ -1,7 +1,6 @@
 package com.example.imagesender;
 
 import android.bluetooth.BluetoothAdapter;
-import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothManager;
 import android.content.Context;
 import android.content.Intent;
@@ -23,12 +22,11 @@ import androidx.core.content.ContextCompat;
 
 import android.Manifest;
 
-import com.example.imagesender.activity.BluetoothDeviceSelectionActivity;
+import com.example.imagesender.bluetooth.BluetoothDeviceSelectionActivity;
 import com.example.imagesender.activity.ImageSelectorActivity;
 import com.example.imagesender.utils.ImageUtils;
-import com.example.imagesender.utils.network.BluetoothNusSendFile;
+import com.example.imagesender.bluetooth.BluetoothNusSendFile;
 import com.example.imagesender.utils.network.HttpsServerUtil;
-import com.example.taskforce.utils.network.NUSFileSender;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -123,7 +121,7 @@ public class MainActivity extends AppCompatActivity {
         String dz38Data = serverUtil.sendBase64ToServer(imageBase64);
         if (dz38Data != null) {
             File tmpFile = imageUtils.base64ToPng(dz38Data);
-            BluetoothNusSendFile nusFileSender = new BluetoothNusSendFile(bluetoothAdapter, deviceAddress);
+            BluetoothNusSendFile nusFileSender = new BluetoothNusSendFile(this,bluetoothAdapter, deviceAddress);
             nusFileSender.sendPngFile(tmpFile);
         } else {
             Toast.makeText(MainActivity.this, "Empty result from https server", Toast.LENGTH_SHORT).show();

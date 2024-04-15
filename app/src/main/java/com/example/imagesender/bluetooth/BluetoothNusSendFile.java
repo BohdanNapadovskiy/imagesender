@@ -1,11 +1,13 @@
-package com.example.imagesender.utils.network;
+package com.example.imagesender.bluetooth;
 
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothSocket;
 import android.content.Context;
 import android.util.Log;
+import android.widget.Toast;
 
+import com.example.imagesender.MainActivity;
 import com.example.imagesender.enums.ServiceEnum;
 
 import java.io.File;
@@ -19,13 +21,16 @@ import java.util.UUID;
 
 public class BluetoothNusSendFile {
 
+    private Context context;
     private BluetoothAdapter bluetoothAdapter;
     private BluetoothSocket bluetoothSocket;
     private OutputStream outputStream;
+    private BluetoothConnectionManager bluetoothManager;
     private static final UUID NUS_UUID = UUID.fromString(ServiceEnum.SERVICE_UUID.value);
     private static final String TAG = "BluetoothNusSendFile";
 
-    public BluetoothNusSendFile(BluetoothAdapter adapter, String address) {
+    public BluetoothNusSendFile(Context con, BluetoothAdapter adapter, String address) {
+        context = con;
         bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
         if (bluetoothAdapter == null) {
             Log.e(TAG, "Device does not support Bluetooth");
@@ -41,15 +46,19 @@ public class BluetoothNusSendFile {
         // Assume 'bluetoothDevice' is your previously connected or discovered device
         try {
             BluetoothDevice bluetoothDevice = adapter.getRemoteDevice(address);
-            bluetoothSocket = bluetoothDevice.createRfcommSocketToServiceRecord(NUS_UUID);
-            bluetoothSocket.connect();
-            outputStream = bluetoothSocket.getOutputStream();
+            bluetoothManager = new BluetoothConnectionManager(bluetoothDevice, ServiceEnum.NUS_SERVICE_UUID.value);
+            bluetoothManager.discoverServicesAndCheckUUID(bluetoothDevice);
+            outputStream = bluetoothManager.getSocket().getOutputStream();
         } catch (IOException e) {
             Log.e(TAG, "Could not connect or get output stream: " + e.getMessage());
         }
     }
 
     public void sendPngFile(File file) {
+        if (outputStream == null) {
+            Toast.makeText(context, "Error during ne sending file by bluetooth", Toast.LENGTH_SHORT).show();
+            return;
+        }
         byte[] fileData = readFile(file);
         if (fileData != null) {
             List<byte[]> chunks = splitByteArray(fileData, 20);  // Assuming MTU is 20 bytes
@@ -57,13 +66,15 @@ public class BluetoothNusSendFile {
                 for (byte[] chunk : chunks) {
                     outputStream.write(chunk);
                     outputStream.flush();
-//                    // Optionally, you can introduce a small delay here if needed
-//                    Thread.sleep(10); // Just an example, adjust based on your requirements
                 }
-            } catch (IOException  e) {
-                Log.e(TAG, "Error sending PNG data: " + e.getMessage());
+                Toast.makeText(context, "File sent successfully via Bluetooth", Toast.LENGTH_SHORT).show();
+                bluetoothManager.closeConnection();
+            } catch (IOException e) {
+                Toast.makeText(context, "Error during ne sending file via bluetooth", Toast.LENGTH_SHORT).show();
+//                Log.e(TAG, "Error sending PNG data: " + e.getMessage());
             } finally {
                 closeConnection();
+                bluetoothManager.closeConnection();
             }
         }
     }
@@ -73,7 +84,7 @@ public class BluetoothNusSendFile {
         try (FileInputStream fis = new FileInputStream(file)) {
             fis.read(bytesArray);
         } catch (IOException e) {
-            Log.e(TAG, "Error reading file: " + e.getMessage());
+            Toast.makeText(context, "Error during ne sending file by bluetooth", Toast.LENGTH_SHORT).show();
             return null;
         }
         return bytesArray;
