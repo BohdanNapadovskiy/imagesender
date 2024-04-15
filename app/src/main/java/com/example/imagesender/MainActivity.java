@@ -130,7 +130,7 @@ public class MainActivity extends AppCompatActivity {
     private void initializeBluetooth() {
         BluetoothManager bluetoothManager = (BluetoothManager) getSystemService(Context.BLUETOOTH_SERVICE);
         bluetoothAdapter = bluetoothManager.getAdapter();
-        nusFileSender = new NUSFileSender(this, bluetoothAdapter);
+        nusFileSender = new NUSFileSender(this);
     }
 
     @Override

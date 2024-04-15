@@ -20,7 +20,7 @@ import java.util.Arrays
 import java.util.UUID
 import kotlin.math.min
 
-class NUSFileSender(context: Context?, bluetoothAdapter: BluetoothAdapter) {
+class NUSFileSender(context: Context?) {
     private var mDevice: BluetoothDevice? = null
     private var bluetoothSocket: BluetoothSocket? = null
     private var mOutputStream: OutputStream? = null
@@ -42,26 +42,6 @@ class NUSFileSender(context: Context?, bluetoothAdapter: BluetoothAdapter) {
             sendData(fileContents)
         }
     }
-
-
-    private fun bitmapToByteArray(bitmap: Bitmap): ByteArray {
-        val outputStream = ByteArrayOutputStream()
-        bitmap.compress(Bitmap.CompressFormat.PNG, 100, outputStream)
-        return outputStream.toByteArray()
-    }
-
-    private fun splitByteArray(data: ByteArray, chunkSize: Int): List<ByteArray> {
-        val chunks: MutableList<ByteArray> = ArrayList()
-        val length = data.size
-        var i = 0
-        while (i < length) {
-            val end = min(length.toDouble(), (i + chunkSize).toDouble()).toInt()
-            chunks.add(Arrays.copyOfRange(data, i, end))
-            i += chunkSize
-        }
-        return chunks
-    }
-
     private fun readFile(file: File): ByteArray {
         val bytesArray = ByteArray(file.length().toInt())
         try {
@@ -88,8 +68,6 @@ class NUSFileSender(context: Context?, bluetoothAdapter: BluetoothAdapter) {
                 connect()
                 mOutputStream = getOutputStream()
             }
-
-            // Send data in chunks
             val chunkSize = 20 // Example chunk size; adjust based on actual MTU
             var start = 0
             while (start < data.size) {
