@@ -7,7 +7,6 @@ import android.content.Context;
 import android.util.Log;
 import android.widget.Toast;
 
-import com.example.imagesender.MainActivity;
 import com.example.imagesender.enums.ServiceEnum;
 
 import java.io.File;
@@ -17,7 +16,6 @@ import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.UUID;
 
 public class BluetoothNusSendFile {
 
@@ -26,7 +24,7 @@ public class BluetoothNusSendFile {
     private BluetoothSocket bluetoothSocket;
     private OutputStream outputStream;
     private BluetoothConnectionManager bluetoothManager;
-    private static final UUID NUS_UUID = UUID.fromString(ServiceEnum.SERVICE_UUID.value);
+
     private static final String TAG = "BluetoothNusSendFile";
 
     public BluetoothNusSendFile(Context con, BluetoothAdapter adapter, String address) {
@@ -47,7 +45,7 @@ public class BluetoothNusSendFile {
         try {
             BluetoothDevice bluetoothDevice = adapter.getRemoteDevice(address);
             bluetoothManager = new BluetoothConnectionManager(bluetoothDevice, ServiceEnum.NUS_SERVICE_UUID.value);
-            bluetoothManager.discoverServicesAndCheckUUID(bluetoothDevice);
+            bluetoothManager.connect();
             outputStream = bluetoothManager.getSocket().getOutputStream();
         } catch (IOException e) {
             Log.e(TAG, "Could not connect or get output stream: " + e.getMessage());

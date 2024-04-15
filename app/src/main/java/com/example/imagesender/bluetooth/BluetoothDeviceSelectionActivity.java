@@ -32,14 +32,17 @@ import com.example.imagesender.enums.ServiceEnum;
 
 
 import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
+import java.util.stream.Collectors;
 
 public class BluetoothDeviceSelectionActivity extends AppCompatActivity {
-
     private BluetoothAdapter mBluetoothAdapter;
     private ArrayAdapter<String> mArrayAdapter;
+    private Set<BluetoothDevice> mDevices = new HashSet<>();
     BluetoothConnectionManager connectionManager;
-    private ArrayList<BluetoothDevice> mDevices = new ArrayList<>();
-
 
     private final ActivityResultLauncher<Intent> enableBluetoothLauncher = registerForActivityResult(
             new ActivityResultContracts.StartActivityForResult(),
@@ -71,9 +74,11 @@ public class BluetoothDeviceSelectionActivity extends AppCompatActivity {
         ListView listView = findViewById(R.id.listview_bluetooth_devices);
         mArrayAdapter = new ArrayAdapter<>(this, android.R.layout.simple_list_item_1);
         listView.setAdapter(mArrayAdapter);
-        listView.setOnItemClickListener((parent, view, position, id) -> connectToDevice(mDevices.get(position)));
+        listView.setOnItemClickListener((parent, view, position, id) -> {
+            List<BluetoothDevice> deviceList = new ArrayList<>(mDevices);
+            connectToDevice(deviceList.get(position));
+        });
 
-        BluetoothManager bluetoothManager = getSystemService(BluetoothManager.class);
         mBluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
         if (mBluetoothAdapter == null) {
             Toast.makeText(this, "Bluetooth is not supported on this device", Toast.LENGTH_SHORT).show();
@@ -114,9 +119,10 @@ public class BluetoothDeviceSelectionActivity extends AppCompatActivity {
             String action = intent.getAction();
             if (BluetoothDevice.ACTION_FOUND.equals(action)) {
                 BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
-                if (device != null) {
-                    mDevices.add(device);
-                    mArrayAdapter.add(device.getName() + "\n" + device.getAddress());
+                if (device != null && mDevices.add(device)) {
+                    mArrayAdapter.clear();
+                    mArrayAdapter.addAll(mDevices.stream().map(d -> d.getName() + "\n" + d.getAddress()).collect(Collectors.toList()));
+                    mArrayAdapter.notifyDataSetChanged();
                     Log.d(TAG, "Device found: " + device.getName() + ", " + device.getAddress());
                 }
             }
@@ -126,24 +132,18 @@ public class BluetoothDeviceSelectionActivity extends AppCompatActivity {
     private void connectToDevice(BluetoothDevice device) {
         mBluetoothAdapter.cancelDiscovery();
         connectionManager = new BluetoothConnectionManager(device, ServiceEnum.NUS_SERVICE_UUID.value);
-        int status = connectionManager.discoverServicesAndCheckUUID(device);
-        String statusMessage = connectionManager.getStatusMessage(status);
+        connectionManager.connect();
         Toast.makeText(this, "Connected to " + device.getName(), Toast.LENGTH_SHORT).show();
         Intent intent = new Intent(this, MainActivity.class);
         intent.putExtra("device_name", device.getName());
         intent.putExtra("device_address", device.getAddress());
-        intent.putExtra("status", statusMessage);
         startActivity(intent);
-        finish(); // Optional: if you want to close the curren
+        finish();
     }
-
-
-
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        // If using a connection manager instance at a broader scope, disconnect here
         if (connectionManager != null) {
             connectionManager.disconnect();
         }
@@ -154,6 +154,5 @@ public class BluetoothDeviceSelectionActivity extends AppCompatActivity {
             mBluetoothAdapter.cancelDiscovery();
         }
     }
-
 
 }

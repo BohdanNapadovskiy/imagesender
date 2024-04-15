@@ -1,7 +1,5 @@
 package com.example.imagesender.bluetooth;
 
-import static android.content.ContentValues.TAG;
-
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothSocket;
 import android.util.Log;
@@ -26,19 +24,15 @@ public class BluetoothConnectionManager {
         this.socket = null;
     }
 
-    public int discoverServicesAndCheckUUID(BluetoothDevice device) {
+    public int connect() {
         try {
-            socket = device.createInsecureRfcommSocketToServiceRecord(serviceUUID);
-        } catch (Exception e) {
-            Log.e("", "Error creating socket");
-        }
-        try {
+            socket = device.createRfcommSocketToServiceRecord(serviceUUID);
             socket.connect();
-            Log.e("", "Connected");
+            Log.i(TAG, "Connected to the device using NUS UUID");
             return STATUS_CONNECTED;
-        } catch (IOException e) {
-            Log.e("", e.getMessage());
-            return alternativeConnection(device);
+        } catch (Exception e) {
+            Log.e(TAG, "Initial connection failed, trying fallback method...", e);
+            return alternativeConnection();
         }
     }
     public void disconnect() {
@@ -79,7 +73,7 @@ public class BluetoothConnectionManager {
         }
     }
 
-    private int alternativeConnection(BluetoothDevice device) {
+    private int alternativeConnection() {
         try {
             Log.e("", "trying fallback...");
             socket = (BluetoothSocket) device.getClass().getMethod("createRfcommSocket", new Class[]{int.class}).invoke(device, 1);
