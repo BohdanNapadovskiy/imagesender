@@ -25,7 +25,7 @@ import android.Manifest;
 import com.example.imagesender.bluetooth.BluetoothDeviceSelectionActivity;
 import com.example.imagesender.activity.ImageSelectorActivity;
 import com.example.imagesender.utils.ImageUtils;
-import com.example.imagesender.bluetooth.BluetoothNusSendFile;
+import com.example.imagesender.bluetooth.BluetoothNUSFileSender;
 import com.example.imagesender.utils.network.HttpsServerUtil;
 
 import java.io.File;
@@ -44,7 +44,7 @@ public class MainActivity extends AppCompatActivity {
     private static final int PICK_IMAGE_REQUEST = 1;
     private static final int REQUEST_BLUETOOTH_CONNECT = 101;
     private TextView textViewPath;
-    private BluetoothNusSendFile nusFileSender;
+    private BluetoothNUSFileSender nusFileSender;
     private String deviceName;
     private String deviceAddress;
 
@@ -121,8 +121,8 @@ public class MainActivity extends AppCompatActivity {
         String dz38Data = serverUtil.sendBase64ToServer(imageBase64);
         if (dz38Data != null) {
             File tmpFile = imageUtils.base64ToPng(dz38Data);
-            BluetoothNusSendFile nusFileSender = new BluetoothNusSendFile(this,bluetoothAdapter, deviceAddress);
-            nusFileSender.sendPngFile(tmpFile);
+            BluetoothNUSFileSender nusFileSender = new BluetoothNUSFileSender();
+            nusFileSender.sendFile(tmpFile);
         } else {
             Toast.makeText(MainActivity.this, "Empty result from https server", Toast.LENGTH_SHORT).show();
         }
