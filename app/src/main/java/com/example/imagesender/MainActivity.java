@@ -1,6 +1,7 @@
 package com.example.imagesender;
 
 import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothManager;
 import android.content.Context;
 import android.content.Intent;
@@ -25,6 +26,7 @@ import android.Manifest;
 import com.example.imagesender.activity.BluetoothDeviceSelectionActivity;
 import com.example.imagesender.activity.ImageSelectorActivity;
 import com.example.imagesender.utils.ImageUtils;
+import com.example.imagesender.utils.network.BluetoothNusSendFile;
 import com.example.imagesender.utils.network.HttpsServerUtil;
 import com.example.taskforce.utils.network.NUSFileSender;
 
@@ -44,7 +46,7 @@ public class MainActivity extends AppCompatActivity {
     private static final int PICK_IMAGE_REQUEST = 1;
     private static final int REQUEST_BLUETOOTH_CONNECT = 101;
     private TextView textViewPath;
-    private NUSFileSender nusFileSender;
+    private BluetoothNusSendFile nusFileSender;
     private String deviceName;
     private String deviceAddress;
 
@@ -69,9 +71,11 @@ public class MainActivity extends AppCompatActivity {
         if (intent != null) {
             deviceName = intent.getStringExtra("device_name");
             deviceAddress = intent.getStringExtra("device_address");
+            String status = intent.getStringExtra("status");
             TextView statusTextView = findViewById(R.id.status_text_view); // Assuming you have a TextView for this
-            statusTextView.setText("Device: " + deviceName + "\nAddress: " + deviceAddress);
+            statusTextView.setText("Device: " + deviceName + "\nAddress: " + deviceAddress+"\nStatus: " + status);
         }
+
 
         findViewById(R.id.button_select_image).setOnClickListener(view -> {
             startActivity(new Intent(MainActivity.this, ImageSelectorActivity.class));
@@ -119,7 +123,8 @@ public class MainActivity extends AppCompatActivity {
         String dz38Data = serverUtil.sendBase64ToServer(imageBase64);
         if (dz38Data != null) {
             File tmpFile = imageUtils.base64ToPng(dz38Data);
-            nusFileSender.sendFileOverBluetooth(this,tmpFile);
+            BluetoothNusSendFile nusFileSender = new BluetoothNusSendFile(bluetoothAdapter, deviceAddress);
+            nusFileSender.sendPngFile(tmpFile);
         } else {
             Toast.makeText(MainActivity.this, "Empty result from https server", Toast.LENGTH_SHORT).show();
         }
@@ -130,7 +135,6 @@ public class MainActivity extends AppCompatActivity {
     private void initializeBluetooth() {
         BluetoothManager bluetoothManager = (BluetoothManager) getSystemService(Context.BLUETOOTH_SERVICE);
         bluetoothAdapter = bluetoothManager.getAdapter();
-        nusFileSender = new NUSFileSender(this);
     }
 
     @Override

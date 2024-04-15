@@ -21,14 +21,12 @@ import android.widget.Toast;
 
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
-import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
 
+import com.example.imagesender.MainActivity;
 import com.example.imagesender.R;
-import com.example.imagesender.enums.ServiceEnum;
 
 
 import java.io.IOException;
@@ -40,7 +38,9 @@ public class BluetoothDeviceSelectionActivity extends AppCompatActivity {
     private BluetoothAdapter mBluetoothAdapter;
     private ArrayAdapter<String> mArrayAdapter;
     private ArrayList<BluetoothDevice> mDevices = new ArrayList<>();
-    private static final int REQUEST_BLUETOOTH_PERMISSIONS = 101;
+    public static final int STATUS_CONNECTING = 1;
+    public static final int STATUS_CONNECTED = 2;
+    public static final int STATUS_FAILED = 3;
 
     private final ActivityResultLauncher<Intent> enableBluetoothLauncher = registerForActivityResult(
             new ActivityResultContracts.StartActivityForResult(),
@@ -95,7 +95,7 @@ public class BluetoothDeviceSelectionActivity extends AppCompatActivity {
                 (ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_SCAN) != PackageManager.PERMISSION_GRANTED ||
                         ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED)
                 || ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            requestPermissionLauncher.launch(new String[]{Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT,Manifest.permission.ACCESS_FINE_LOCATION });
+            requestPermissionLauncher.launch(new String[]{Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT, Manifest.permission.ACCESS_FINE_LOCATION});
         } else {
             startBluetoothDiscovery();
         }
@@ -115,12 +115,10 @@ public class BluetoothDeviceSelectionActivity extends AppCompatActivity {
             String action = intent.getAction();
             if (BluetoothDevice.ACTION_FOUND.equals(action)) {
                 BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
-                if (device != null ) {
-//                    if(device.getName() != null) {
-                        mDevices.add(device);
-                        mArrayAdapter.add(device.getName() + "\n" + device.getAddress());
-                        Log.d(TAG, "Device found: " + device.getName() + ", " + device.getAddress());
-//                    }
+                if (device != null) {
+                    mDevices.add(device);
+                    mArrayAdapter.add(device.getName() + "\n" + device.getAddress());
+                    Log.d(TAG, "Device found: " + device.getName() + ", " + device.getAddress());
                 }
             }
         }
@@ -129,18 +127,71 @@ public class BluetoothDeviceSelectionActivity extends AppCompatActivity {
     private void connectToDevice(BluetoothDevice device) {
         BluetoothSocket socket;
         mBluetoothAdapter.cancelDiscovery();
+        int status = discoverServicesAndCheckUUID(device);
+        String statusMessage = getStatusMessage(status);
+        Toast.makeText(this, "Connected to " + device.getName(), Toast.LENGTH_SHORT).show();
+        Intent intent = new Intent(this, MainActivity.class);
+        intent.putExtra("device_name", device.getName());
+        intent.putExtra("device_address", device.getAddress());
+        intent.putExtra("status", statusMessage);
+        startActivity(intent);
+        finish(); // Optional: if you want to close the curren
+    }
+
+    private int discoverServicesAndCheckUUID(BluetoothDevice device) {
+        BluetoothSocket socket = null;
+        UUID SERIAL_UUID = UUID.fromString("00001101-0000-1000-8000-00805f9b34fb");
         try {
-            socket = device.createRfcommSocketToServiceRecord(UUID.fromString(ServiceEnum.NUS_SERVICE_UUID.value));
-            // Implement retry mechanism here
+            socket = device.createInsecureRfcommSocketToServiceRecord(SERIAL_UUID);
+        } catch (Exception e) {
+            Log.e("", "Error creating socket");
+        }
+        try {
             socket.connect();
-            Toast.makeText(this, "Connected to " + device.getName(), Toast.LENGTH_SHORT).show();
+            Log.e("", "Connected");
+            return STATUS_CONNECTED;
         } catch (IOException e) {
-            Log.e("Bluetooth", "Connection failed", e);
-            Toast.makeText(this, "Connection failed: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-            // Consider retrying the connection here
+            Log.e("", e.getMessage());
+            return alternativeConnection(device);
+        } finally {
+            try {
+                if (socket != null) {
+                    socket.close();
+                }
+            } catch (IOException exception) {
+                Log.e(TAG, "Failed to close socket", exception);
+            }
+
         }
     }
 
+
+    private int alternativeConnection(BluetoothDevice device) {
+        try {
+            Log.e("", "trying fallback...");
+            BluetoothSocket socket = (BluetoothSocket) device.getClass().getMethod("createRfcommSocket", new Class[]{int.class}).invoke(device, 1);
+            socket.connect();
+            Log.e("", "Connected");
+            return STATUS_CONNECTED;
+        } catch (Exception e2) {
+            Log.e("", "Couldn't establish Bluetooth connection!");
+            return STATUS_FAILED;
+        }
+
+    }
+
+    private String getStatusMessage(int status) {
+        switch (status) {
+            case STATUS_CONNECTING:
+                return "Connecting";
+            case STATUS_CONNECTED:
+                return "Connected";
+            case STATUS_FAILED:
+                return "Failed";
+            default:
+                return "Unknown";
+        }
+    }
     @Override
     protected void onDestroy() {
         super.onDestroy();
@@ -151,8 +202,6 @@ public class BluetoothDeviceSelectionActivity extends AppCompatActivity {
             mBluetoothAdapter.cancelDiscovery();
         }
     }
-
-
 
 
 }

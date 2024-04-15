@@ -24,7 +24,7 @@ class NUSFileSender(context: Context?) {
     private var mDevice: BluetoothDevice? = null
     private var bluetoothSocket: BluetoothSocket? = null
     private var mOutputStream: OutputStream? = null
-    private val context: Context? = null
+    private var gContext: Context? = null
 
     init {
         if (ActivityCompat.checkSelfPermission(
@@ -37,6 +37,7 @@ class NUSFileSender(context: Context?) {
     }
 
     fun sendFileOverBluetooth(context: Context?, file: File) {
+        gContext= context;
         val fileContents = readFile(file)
         if (fileContents != null) {
             sendData(fileContents)
@@ -55,7 +56,7 @@ class NUSFileSender(context: Context?) {
     private fun sendData(data: ByteArray) {
         try {
             if (ActivityCompat.checkSelfPermission(
-                    context!!,
+                    gContext!!,
                     Manifest.permission.BLUETOOTH_CONNECT
                 ) != PackageManager.PERMISSION_GRANTED
             ) {
