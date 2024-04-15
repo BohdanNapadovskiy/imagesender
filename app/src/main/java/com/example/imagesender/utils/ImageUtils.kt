@@ -8,6 +8,7 @@ import android.util.Log
 import androidx.constraintlayout.widget.Constraints
 import java.io.ByteArrayOutputStream
 import java.io.File
+import java.io.FileOutputStream
 import java.io.IOException
 
 class ImageUtils {
@@ -25,10 +26,20 @@ class ImageUtils {
         return Base64.encodeToString(byteArray, Base64.DEFAULT)
     }
 
-    fun base64ToBitmap(base64String: String?): Bitmap {
-        val decodedString = Base64.decode(base64String, Base64.DEFAULT)
-        return BitmapFactory.decodeByteArray(decodedString, 0, decodedString.size)
+    fun base64ToPng(base64String: String): File {
+        val filename = "tmp_file.png";
+        val imageBytes = Base64.decode(base64String, Base64.DEFAULT)
+        val tempDir = File(System.getProperty("java.io.tmpdir"))
+        if (!tempDir.exists()) {
+            tempDir.mkdirs()
+        }
+        val imageFile = File(tempDir, filename)
+        FileOutputStream(imageFile).use { output ->
+            output.write(imageBytes)
+        }
+        return imageFile
     }
+
 
     fun convertBase64ToImage(context: Context, base64String: String?, fileName: String): String? {
         val decodedBytes = Base64.decode(base64String, Base64.DEFAULT)

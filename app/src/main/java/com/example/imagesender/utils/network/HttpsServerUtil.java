@@ -3,17 +3,22 @@ package com.example.imagesender.utils.network;
 import static android.service.controls.ControlsProviderService.TAG;
 
 import android.content.Context;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
 import android.widget.Toast;
 
 import com.example.imagesender.enums.ServiceEnum;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.BufferedInputStream;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -62,11 +67,17 @@ public class HttpsServerUtil {
 
 
     public String sendBase64ToServer(String base64Image) {
-        String result =null;
-        Future<String> futureResult =  executorService.submit(() -> {
+        String cmd = "dither";
+        Map<String, Object> data = new HashMap<>();
+        data.put(".command", cmd);
+        data.put(".msgid", "1");
+        data.put("key", "01Az8nB8mB4cCV");
+        data.put("data", base64Image);
+        Future<String> futureString = executorService.submit(() -> {
             MediaType JSON = MediaType.get("application/json; charset=utf-8");
-            String json = "{\"image\": \"" + base64Image + "\"}";
-            RequestBody body = RequestBody.create(json, JSON);
+            ObjectMapper objectMapper = new ObjectMapper();
+            String jsonPayload = objectMapper.writeValueAsString(data);
+            RequestBody body = RequestBody.create(jsonPayload, JSON);
             Request request = new Request.Builder()
                     .url(ServiceEnum.HTTPS_SERVER.value)
                     .post(body)
@@ -74,28 +85,27 @@ public class HttpsServerUtil {
             Response response = client.newCall(request).execute();
             return response.body().string();
         });
+        return getResultFromFutreString(futureString);
+
+    }
+
+    public boolean isNetworkConnected(Context context) {
+        ConnectivityManager connectivityManager = (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
+        if (connectivityManager != null) {
+            NetworkInfo activeNetwork = connectivityManager.getActiveNetworkInfo();
+            return activeNetwork != null && activeNetwork.isConnected();
+        }
+        return false;
+    }
+
+    private String getResultFromFutreString(Future<String> future) {
+        String result = null;
         try {
-            result = futureResult.get();
+            result = future.get();
         } catch (ExecutionException | InterruptedException e) {
             Log.e(TAG, "Error getting result from server");
         }
         return result;
-
-
-    }
-
-    public Future<String> sendImageToServer(String base64Image) {
-        return executorService.submit(() -> {
-            MediaType JSON = MediaType.get("application/json; charset=utf-8");
-            String json = "{\"image\": \"" + base64Image + "\"}";
-            RequestBody body = RequestBody.create(json, JSON);
-            Request request = new Request.Builder()
-                    .url(ServiceEnum.HTTPS_SERVER.value)
-                    .post(body)
-                    .build();
-            Response response = client.newCall(request).execute();
-            return response.body().string();
-        });
     }
 
 }

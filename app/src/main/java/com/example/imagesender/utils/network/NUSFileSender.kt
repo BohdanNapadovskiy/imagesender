@@ -36,29 +36,13 @@ class NUSFileSender(context: Context?, bluetoothAdapter: BluetoothAdapter) {
         }
     }
 
-    fun sendFileOverBluetooth(context: Context?, filePath: String?) {
-        val file = File(filePath)
+    fun sendFileOverBluetooth(context: Context?, file: File) {
         val fileContents = readFile(file)
         if (fileContents != null) {
             sendData(fileContents)
         }
     }
 
-    fun sendBitmapOverBluetooth(bitmap: Bitmap) {
-        val imageData = bitmapToByteArray(bitmap)
-        val chunks = splitByteArray(imageData, 20) // Assuming MTU is 20 bytes
-        try {
-            for (chunk in chunks) {
-                mOutputStream!!.write(chunk)
-                mOutputStream!!.flush()
-                Thread.sleep(10)
-            }
-        } catch (e: IOException) {
-            Log.e(ContentValues.TAG, "Error sending image data: " + e.message)
-        } catch (e: InterruptedException) {
-            Log.e(ContentValues.TAG, "Error sending image data: " + e.message)
-        }
-    }
 
     private fun bitmapToByteArray(bitmap: Bitmap): ByteArray {
         val outputStream = ByteArrayOutputStream()

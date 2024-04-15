@@ -5,27 +5,21 @@ import android.bluetooth.BluetoothManager;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
-import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.graphics.drawable.BitmapDrawable;
-import android.net.Uri;
 import android.os.Bundle;
-import android.provider.OpenableColumns;
-import android.view.View;
 import android.widget.Button;
-import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import androidx.activity.result.ActivityResult;
-import androidx.activity.result.ActivityResultCallback;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
+
 import android.Manifest;
 
 import com.example.imagesender.activity.BluetoothDeviceSelectionActivity;
@@ -49,11 +43,10 @@ public class MainActivity extends AppCompatActivity {
     private ActivityResultLauncher<Intent> intentContent;
     private static final int PICK_IMAGE_REQUEST = 1;
     private static final int REQUEST_BLUETOOTH_CONNECT = 101;
-
     private TextView textViewPath;
-
-
     private NUSFileSender nusFileSender;
+    private String deviceName;
+    private String deviceAddress;
 
 
     @Override
@@ -74,8 +67,8 @@ public class MainActivity extends AppCompatActivity {
 
         Intent intent = getIntent();
         if (intent != null) {
-            String deviceName = intent.getStringExtra("device_name");
-            String deviceAddress = intent.getStringExtra("device_address");
+            deviceName = intent.getStringExtra("device_name");
+            deviceAddress = intent.getStringExtra("device_address");
             TextView statusTextView = findViewById(R.id.status_text_view); // Assuming you have a TextView for this
             statusTextView.setText("Device: " + deviceName + "\nAddress: " + deviceAddress);
         }
@@ -100,26 +93,38 @@ public class MainActivity extends AppCompatActivity {
                 startActivity(new Intent(MainActivity.this, BluetoothDeviceSelectionActivity.class)));
 
         findViewById(R.id.button_send_image)
-                .setOnClickListener(view -> sendImageVyBluetooth());
+                .setOnClickListener(view -> sendImageByBluetooth());
     }
 
-    private void sendImageVyBluetooth() {
+    private void sendImageByBluetooth() {
         if (mImageView.getDrawable() != null) {
-            BitmapDrawable drawable = (BitmapDrawable) mImageView.getDrawable();
-            File file =  saveBitmapToCache(drawable.getBitmap()) ;
-            String imageBase64 = imageUtils.pmgFileToBase64(file);
-            String dz38Data = serverUtil.sendBase64ToServer(imageBase64);
-            if(dz38Data.length() >3) {
-                Bitmap convertedImage = imageUtils.base64ToBitmap(dz38Data);
-                nusFileSender.sendBitmapOverBluetooth(convertedImage);
+            if (serverUtil.isNetworkConnected(this)) {
+                if (deviceAddress !=null) {
+                    sendFile();
+                } else {
+                    Toast.makeText(MainActivity.this, "Bluetooth device not selected!", Toast.LENGTH_SHORT).show();
+                }
             } else {
-                Toast.makeText(MainActivity.this, "Empty result from https server", Toast.LENGTH_SHORT).show();
+                Toast.makeText(MainActivity.this, "No internet connection!", Toast.LENGTH_SHORT).show();
             }
-
         } else {
             Toast.makeText(MainActivity.this, "No image selected!", Toast.LENGTH_SHORT).show();
         }
     }
+
+    private void sendFile() {
+        BitmapDrawable drawable = (BitmapDrawable) mImageView.getDrawable();
+        File file = saveBitmapToCache(drawable.getBitmap());
+        String imageBase64 = imageUtils.pmgFileToBase64(file);
+        String dz38Data = serverUtil.sendBase64ToServer(imageBase64);
+        if (dz38Data != null) {
+            File tmpFile = imageUtils.base64ToPng(dz38Data);
+            nusFileSender.sendFileOverBluetooth(this,tmpFile);
+        } else {
+            Toast.makeText(MainActivity.this, "Empty result from https server", Toast.LENGTH_SHORT).show();
+        }
+    }
+
 
 
     private void initializeBluetooth() {
@@ -166,7 +171,6 @@ public class MainActivity extends AppCompatActivity {
         }
         return file;
     }
-
 
 
 }

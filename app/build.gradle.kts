@@ -36,7 +36,7 @@ android {
 }
 
 dependencies {
-
+    implementation("com.fasterxml.jackson.core:jackson-databind:2.0.1")
     implementation("com.squareup.okhttp3:okhttp:4.9.1")
     implementation(libs.appcompat)
     implementation(libs.material)
