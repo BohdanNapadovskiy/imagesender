@@ -43,7 +43,6 @@ public class BluetoothConnectionManager implements Runnable {
 
     public void connect() {
         try {
-//            socket = (BluetoothSocket) device.getClass().getMethod("createRfcommSocket", new Class[]{int.class}).invoke(device, 1);
             socket = device.createInsecureRfcommSocketToServiceRecord(this.serviceUUID);
             socket.connect();
             Log.i(TAG, "Connected to the device using NUS UUID");

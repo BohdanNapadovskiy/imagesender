@@ -2,16 +2,17 @@ package com.example.imagesender.utils
 
 import android.content.Context
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.util.Base64
 import android.util.Log
+import android.widget.Toast
 import androidx.constraintlayout.widget.Constraints
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
 
-class ImageUtils {
+class ImageUtils(var context: Context) {
+
 
     fun pmgFileToBase64(file: File):String {
         val bytes = file.readBytes()
@@ -28,16 +29,22 @@ class ImageUtils {
 
     fun base64ToPng(base64String: String): File {
         val filename = "tmp_file.png";
-        val imageBytes = Base64.decode(base64String, Base64.DEFAULT)
-        val tempDir = File(System.getProperty("java.io.tmpdir"))
-        if (!tempDir.exists()) {
-            tempDir.mkdirs()
+        var imageFile: File? = null
+        try {
+            val imageBytes = Base64.decode(base64String, Base64.DEFAULT)
+            val tempDir = File(System.getProperty("java.io.tmpdir"))
+            if (!tempDir.exists()) {
+                tempDir.mkdirs()
+            }
+            imageFile = File(tempDir, filename)
+            FileOutputStream(imageFile).use { output ->
+                output.write(imageBytes)
+            }
+            return imageFile
+        } catch ( e: IllegalArgumentException) {
+            Toast.makeText(context, "Cannot convert base64 to image!", Toast.LENGTH_SHORT).show()
         }
-        val imageFile = File(tempDir, filename)
-        FileOutputStream(imageFile).use { output ->
-            output.write(imageBytes)
-        }
-        return imageFile
+        return imageFile!!;
     }
 
 

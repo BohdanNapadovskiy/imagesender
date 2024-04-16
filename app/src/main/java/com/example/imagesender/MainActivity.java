@@ -62,7 +62,7 @@ public class MainActivity extends AppCompatActivity {
             initializeBluetooth();
         }
 
-        imageUtils = new ImageUtils();
+        imageUtils = new ImageUtils(this);
         serverUtil = new HttpsServerUtil(this);
 
         Intent intent = getIntent();
@@ -121,7 +121,7 @@ public class MainActivity extends AppCompatActivity {
         String dz38Data = serverUtil.sendBase64ToServer(imageBase64);
         if (dz38Data != null) {
             File tmpFile = imageUtils.base64ToPng(dz38Data);
-            BluetoothNUSFileSender nusFileSender = new BluetoothNUSFileSender();
+            BluetoothNUSFileSender nusFileSender = new BluetoothNUSFileSender(this);
             nusFileSender.sendFile(tmpFile);
         } else {
             Toast.makeText(MainActivity.this, "Empty result from https server", Toast.LENGTH_SHORT).show();
