@@ -35,20 +35,22 @@ import androidx.core.content.ContextCompat;
 import com.example.imagesender.MainActivity;
 import com.example.imagesender.R;
 import com.example.imagesender.enums.ServiceEnum;
+import com.example.imagesender.permisssion.PermissionManager;
 
 
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 
 public class BluetoothDeviceSelectionActivity extends AppCompatActivity {
 
-    private BluetoothGatt mBluetoothGatt;
     private BluetoothAdapter mBluetoothAdapter;
     private ArrayAdapter<String> mArrayAdapter;
+    private PermissionManager permissionManager;
+    private static final int PERMISSIONS_REQUEST_CODE = 100;
     private List<BluetoothDevice> mDevices = new ArrayList<>();
-
 
     private final ActivityResultLauncher<Intent> enableBluetoothLauncher = registerForActivityResult(
             new ActivityResultContracts.StartActivityForResult(),
@@ -63,6 +65,7 @@ public class BluetoothDeviceSelectionActivity extends AppCompatActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        permissionManager = new PermissionManager(this, PERMISSIONS_REQUEST_CODE);
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_bluetooth);
         ListView listView = findViewById(R.id.listview_bluetooth_devices);
@@ -82,71 +85,38 @@ public class BluetoothDeviceSelectionActivity extends AppCompatActivity {
 
 
     private void checkAndRequestPermissions() {
-        // Check for Android 12 and newer specific permissions
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            // For Android 12 (API 31) and above, check for BLUETOOTH_SCAN and BLUETOOTH_CONNECT permissions
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_SCAN) != PackageManager.PERMISSION_GRANTED ||
                     ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED ||
                     ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-                requestPermissionLauncher.launch(new String[]{
+                ActivityCompat.requestPermissions(this, new String[]{
                         Manifest.permission.BLUETOOTH_SCAN,
                         Manifest.permission.BLUETOOTH_CONNECT,
-                        Manifest.permission.ACCESS_FINE_LOCATION});
-            } else {
-                startBLEScan();
-            }
-        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            // For Android 6 (Marshmallow) to Android 11, check for ACCESS_FINE_LOCATION
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-                requestPermissionLauncher.launch(new String[]{Manifest.permission.ACCESS_FINE_LOCATION});
+                        Manifest.permission.ACCESS_FINE_LOCATION
+                }, 1);
             } else {
                 startBLEScan();
             }
         } else {
-            // Below Android 6.0, runtime permissions are not required, so directly start BLE scan
-            startBLEScan();
+            startBLEScan(); // Assume permissions are granted below Android 12 for simplicity
         }
     }
 
     private void startBLEScan() {
-//        ArrayList<ScanFilter> filters = new ArrayList<>();
-//        ScanFilter nusFilter = new ScanFilter.Builder()
-//                .setServiceUuid(new ParcelUuid(UUID.fromString(ServiceEnum.NUS_SERVICE_UUID.value)))
-//                .build();
-//        filters.add(nusFilter);
-
         ScanSettings settings = new ScanSettings.Builder()
                 .setScanMode(ScanSettings.SCAN_MODE_LOW_POWER)
                 .build();
-
         String requiredPermission;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             requiredPermission = Manifest.permission.BLUETOOTH_SCAN;
         } else {
             requiredPermission = Manifest.permission.ACCESS_FINE_LOCATION; // Consider ACCESS_COARSE_LOCATION if less precision is acceptable
         }
-
         if (ActivityCompat.checkSelfPermission(this, requiredPermission) != PackageManager.PERMISSION_GRANTED) {
             return; // Exit the method if the necessary permissions are not granted
         }
-        mBluetoothAdapter.getBluetoothLeScanner().startScan(null, settings, new ScanCallback() {
-
-            @Override
-            public void onScanResult(int callbackType, ScanResult result) {
-                Log.i(TAG, "Start scaning bluetooth device");
-                BluetoothDevice device = result.getDevice();
-                if (!mDevices.contains(device)) {
-                    mDevices.add(device);
-                    mArrayAdapter.add(device.getName() + "\n" + device.getAddress());
-                    mArrayAdapter.notifyDataSetChanged();
-                }
-            }
-
-            @Override
-            public void onScanFailed(int errorCode) {
-                Log.e(TAG, "BLE Scan Failed with code " + errorCode);
-            }
-        });
+        BluetoothScanCallback scanCallback = new BluetoothScanCallback(mArrayAdapter, mDevices, this);
+        mBluetoothAdapter.getBluetoothLeScanner().startScan(null, settings, scanCallback);
     }
 
     private void connectToDevice(BluetoothDevice device) {
@@ -156,78 +126,17 @@ public class BluetoothDeviceSelectionActivity extends AppCompatActivity {
         } else {
             requiredPermission = Manifest.permission.ACCESS_FINE_LOCATION; // Consider ACCESS_COARSE_LOCATION if less precision is acceptable
         }
-
         if (ActivityCompat.checkSelfPermission(this, requiredPermission) != PackageManager.PERMISSION_GRANTED) {
             return; // Exit the method if the necessary permissions are not granted
         }
-        mBluetoothGatt = device.connectGatt(this, false, new BluetoothGattCallback() {
-            @Override
-            public void onConnectionStateChange(BluetoothGatt gatt, int status, int newState) {
-                super.onConnectionStateChange(gatt, status, newState);
-                if (status == BluetoothGatt.GATT_SUCCESS) {
-                    if (newState == BluetoothProfile.STATE_CONNECTED) {
-                        Log.i(TAG, "Connected to GATT server.");
-                        // Attempts to discover services after successful connection.
-                        gatt.discoverServices();
-                        CustomBluetoothManager.getInstance().setGatt(gatt);
-                    } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
-                        Log.i(TAG, "Disconnected from GATT server.");
-                    }
-                } else {
-                    Log.w(TAG, "Error " + status + " encountered for " + device.getAddress() + "! Disconnecting...");
-                    gatt.close();
-                }
-            }
-
-            @Override
-            public void onServicesDiscovered(BluetoothGatt gatt, int status) {
-                super.onServicesDiscovered(gatt, status);
-                if (status == BluetoothGatt.GATT_SUCCESS) {
-                    BluetoothGattService nusService = gatt.getService(UUID.fromString("6E400003-B5A3-F393-E0A9-E50E24DCCA9E"));
-                    if (nusService != null) {
-                        BluetoothGattCharacteristic rxCharacteristic = nusService.getCharacteristic(UUID.fromString("6E400003-B5A3-F393-E0A9-E50E24DCCA9E"));
-                        if (rxCharacteristic != null) {
-                            gatt.setCharacteristicNotification(rxCharacteristic, true);
-                            BluetoothGattDescriptor descriptor = rxCharacteristic.getDescriptor(UUID.fromString("00002902-0000-1000-8000-00805f9b34fb"));
-                            if (descriptor != null) {
-                                descriptor.setValue(BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE);
-                                gatt.writeDescriptor(descriptor);
-                            }
-                        }
-                    } else {
-                        Log.w(TAG, "NUS Service not found on device.");
-                    }
-                } else {
-                    Log.w(TAG, "onServicesDiscovered received: " + status);
-                }
-            }
-
-            @Override
-            public void onCharacteristicRead(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic, int status) {
-                if (status == BluetoothGatt.GATT_SUCCESS) {
-                    readCharacteristic(characteristic);
-                }
-            }
-
-            @Override
-            public void onCharacteristicChanged(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic) {
-                readCharacteristic(characteristic);
-            }
-
-            private void readCharacteristic(BluetoothGattCharacteristic characteristic) {
-                if (UUID.fromString(ServiceEnum.NUS_TX_CHARACTERISTIC_UUID.value).equals(characteristic.getUuid())) {
-                    byte[] data = characteristic.getValue();
-                    String strData = new String(data, StandardCharsets.UTF_8);
-                    Log.i(TAG, "Received data: " + strData);
-                    runOnUiThread(() -> Toast.makeText(BluetoothDeviceSelectionActivity.this, "Received: " + strData, Toast.LENGTH_SHORT).show());
-                }
-            }
-        });
+        ImageSenderGattCallback gattCallback = new ImageSenderGattCallback(this);
+        device.connectGatt(this, false, gattCallback);
+        Log.i("TAG", "Connecting to device: " + device.getName());
         Toast.makeText(this, "Connecting to " + device.getName(), Toast.LENGTH_SHORT).show();
         Intent intent = new Intent(this, MainActivity.class);
         intent.putExtra("device_name", device.getName());
         intent.putExtra("device_address", device.getAddress());
-//        intent.putExtra("status", connectionManager.getStatusMessage());
+        intent.putExtra("status", "Connected");
         startActivity(intent);
         finish();
 
@@ -236,25 +145,14 @@ public class BluetoothDeviceSelectionActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        if (mBluetoothGatt != null) {
-            mBluetoothGatt.close();
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_SCAN)
+                != PackageManager.PERMISSION_GRANTED) {
+            return;
         }
         if (mBluetoothAdapter != null && mBluetoothAdapter.getBluetoothLeScanner() != null) {
             mBluetoothAdapter.getBluetoothLeScanner().stopScan(new ScanCallback() {
             });
         }
     }
-
-    private final ActivityResultLauncher<String[]> requestPermissionLauncher = registerForActivityResult(
-            new ActivityResultContracts.RequestMultiplePermissions(),
-            permissions -> {
-                boolean allPermissionsGranted = permissions.values().stream().allMatch(granted -> granted);
-                if (allPermissionsGranted) {
-                    startBLEScan();
-                } else {
-                    Toast.makeText(this, "Bluetooth permissions are required for this feature", Toast.LENGTH_SHORT).show();
-                }
-            }
-    );
 
 }

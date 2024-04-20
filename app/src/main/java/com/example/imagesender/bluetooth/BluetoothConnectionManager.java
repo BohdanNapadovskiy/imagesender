@@ -20,7 +20,6 @@ public class BluetoothConnectionManager implements Runnable {
     private BluetoothDevice device;
     private UUID serviceUUID;
     private final Object lock = new Object();
-
     public static final int STATUS_CONNECTING = 1;
     public static final int STATUS_CONNECTED = 2;
     public static final int STATUS_FAILED = 3;

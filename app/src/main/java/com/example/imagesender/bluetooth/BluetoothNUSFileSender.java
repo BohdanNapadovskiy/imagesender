@@ -46,7 +46,7 @@ public class BluetoothNUSFileSender {
 
     private void sendByteArray(byte[] data) {
         int offset = 0;
-        BluetoothGattService gattService = mBluetoothGatt.getService(UUID.fromString("6E400002-B5A3-F393-E0A9-E50E24DCCA9E"));
+        BluetoothGattService gattService = mBluetoothGatt.getService(UUID.fromString(ServiceEnum.NUS_SERVICE_UUID.value));
         if (gattService != null) {
             while (offset < data.length) {
                 int chunkSize = Math.min(data.length - offset, 20); // Maximum size of a BLE packet
@@ -63,13 +63,13 @@ public class BluetoothNUSFileSender {
             }
         } else {
             Log.e("BluetoothNUSFileSender", "Error during the sending file via bluetooth");
-            Toast.makeText(context, "Error during the sending file via bluetooth", Toast.LENGTH_SHORT).show();
+            Toast.makeText(context, "Required GATT service not found on the device.", Toast.LENGTH_SHORT).show();
         }
     }
 
     private void writeChunkToNUS(byte[] chunk, BluetoothGattService gattService) {
-        BluetoothGattCharacteristic txCharacteristic = mBluetoothGatt.getService(UUID.fromString("6E400002-B5A3-F393-E0A9-E50E24DCCA9E"))
-                .getCharacteristic(UUID.fromString("6E400002-B5A3-F393-E0A9-E50E24DCCA9E"));
+        BluetoothGattCharacteristic txCharacteristic = mBluetoothGatt.getService(UUID.fromString(ServiceEnum.NUS_SERVICE_UUID.value))
+                .getCharacteristic(UUID.fromString(ServiceEnum.NUS_RX_CHARACTERISTIC_UUID.value));
         if (txCharacteristic != null) {
             txCharacteristic.setValue(chunk);
             if (ActivityCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {

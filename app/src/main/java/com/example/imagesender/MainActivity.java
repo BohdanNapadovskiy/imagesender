@@ -1,12 +1,15 @@
 package com.example.imagesender;
 
 import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.BluetoothDevice;
+import android.bluetooth.BluetoothGatt;
 import android.bluetooth.BluetoothManager;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.drawable.BitmapDrawable;
+import android.os.Build;
 import android.os.Bundle;
 import android.widget.Button;
 import android.widget.ImageView;
@@ -16,6 +19,7 @@ import android.widget.Toast;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
+import androidx.annotation.RequiresApi;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
@@ -24,6 +28,8 @@ import android.Manifest;
 
 import com.example.imagesender.bluetooth.BluetoothDeviceSelectionActivity;
 import com.example.imagesender.activity.ImageSelectorActivity;
+import com.example.imagesender.bluetooth.CustomBluetoothManager;
+import com.example.imagesender.permisssion.PermissionManager;
 import com.example.imagesender.utils.ImageUtils;
 import com.example.imagesender.bluetooth.BluetoothNUSFileSender;
 import com.example.imagesender.utils.network.HttpsServerUtil;
@@ -33,43 +39,47 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 
 public class MainActivity extends AppCompatActivity {
+    private CustomBluetoothManager customBluetoothManager;
 
     private Button buttonSendImage;
     private ImageUtils imageUtils;
     private HttpsServerUtil serverUtil;
     private ImageView mImageView;
+    private PermissionManager permissionManager;
     private BluetoothAdapter bluetoothAdapter;
     private ActivityResultLauncher<String> mGetContent;
     private ActivityResultLauncher<Intent> intentContent;
     private static final int PICK_IMAGE_REQUEST = 1;
     private static final int REQUEST_BLUETOOTH_CONNECT = 101;
+    private static final int PERMISSIONS_REQUEST_CODE = 100;
     private TextView textViewPath;
     private BluetoothNUSFileSender nusFileSender;
     private String deviceName;
     private String deviceAddress;
+    private String[] permissions = {
+            Manifest.permission.BLUETOOTH_SCAN,
+            Manifest.permission.BLUETOOTH_CONNECT,
+            Manifest.permission.ACCESS_FINE_LOCATION
+    };
 
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
-
+        customBluetoothManager = CustomBluetoothManager.getInstance();
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_main);
-        // Check if Bluetooth connect permission is granted
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.BLUETOOTH_CONNECT}, REQUEST_BLUETOOTH_CONNECT);
-        } else {
-            // Permission already granted
-            initializeBluetooth();
-        }
-
         imageUtils = new ImageUtils(this);
         serverUtil = new HttpsServerUtil(this);
-
+        permissionManager = new PermissionManager(this, PERMISSIONS_REQUEST_CODE);
+        setContentView(R.layout.activity_main);
+        initializeBluetooth();
         Intent intent = getIntent();
         if (intent != null) {
-            deviceName = intent.getStringExtra("device_name");
-            deviceAddress = intent.getStringExtra("device_address");
-            String status = intent.getStringExtra("status");
+            deviceName = (intent.getStringExtra("device_name") == null) ?
+                    "" : intent.getStringExtra("device_name") ;
+            deviceAddress = (intent.getStringExtra("device_address")== null) ?
+                    "" : intent.getStringExtra("device_address") ;
+            String status = (intent.getStringExtra("status")) == null ?
+                    "" : intent.getStringExtra("status") ;
             TextView statusTextView = findViewById(R.id.status_text_view); // Assuming you have a TextView for this
             statusTextView.setText("Device: " + deviceName + "\nAddress: " + deviceAddress+"\nStatus: " + status);
         }
@@ -115,6 +125,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void sendFile() {
+        BluetoothGatt gatt = CustomBluetoothManager.getInstance().getGatt();
         BitmapDrawable drawable = (BitmapDrawable) mImageView.getDrawable();
         File file = saveBitmapToCache(drawable.getBitmap());
         String imageBase64 = imageUtils.pmgFileToBase64(file);
@@ -131,8 +142,14 @@ public class MainActivity extends AppCompatActivity {
 
 
     private void initializeBluetooth() {
-        BluetoothManager bluetoothManager = (BluetoothManager) getSystemService(Context.BLUETOOTH_SERVICE);
-        bluetoothAdapter = bluetoothManager.getAdapter();
+        if (!permissionManager.hasPermission(Manifest.permission.BLUETOOTH_SCAN) ||
+                !permissionManager.hasPermission(Manifest.permission.BLUETOOTH_CONNECT) ||
+                !permissionManager.hasPermission(Manifest.permission.ACCESS_FINE_LOCATION)) {
+            permissionManager.requestPermissions(permissions);
+        } else {
+            BluetoothManager bluetoothManager = (BluetoothManager) getSystemService(Context.BLUETOOTH_SERVICE);
+            bluetoothAdapter = bluetoothManager.getAdapter();
+        }
     }
 
     @Override
@@ -151,9 +168,7 @@ public class MainActivity extends AppCompatActivity {
 
     public File saveBitmapToCache(Bitmap bitmap) {
         File cachePath = new File(this.getCacheDir(), "images");
-        if (!cachePath.exists()) {
-            cachePath.mkdirs(); // Make sure the directory exists
-        }
+        if (!cachePath.exists()) cachePath.mkdirs(); // Make sure the directory exists
         File file = new File(cachePath, "temp_image.png");
         FileOutputStream outputStream = null;
         try {
