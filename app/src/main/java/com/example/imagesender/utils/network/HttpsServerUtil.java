@@ -51,7 +51,6 @@ public class HttpsServerUtil {
                 URL url = new URL(ServiceEnum.HTTPS_SERVER.value);
                 urlConnection = (HttpURLConnection) url.openConnection();
                 InputStream in = new BufferedInputStream(urlConnection.getInputStream());
-                Thread.sleep(1000);
                 handler.post(() -> Toast.makeText(context, "Connected successfully", Toast.LENGTH_SHORT).show());
             } catch (Exception e) {
                 e.printStackTrace();

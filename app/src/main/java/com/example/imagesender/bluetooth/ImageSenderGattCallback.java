@@ -3,6 +3,7 @@ package com.example.imagesender.bluetooth;
 import static android.content.ContentValues.TAG;
 
 import android.Manifest;
+import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothGatt;
 import android.bluetooth.BluetoothGattCallback;
 import android.bluetooth.BluetoothGattCharacteristic;
@@ -11,6 +12,7 @@ import android.bluetooth.BluetoothGattService;
 import android.bluetooth.BluetoothProfile;
 import android.content.Context;
 import android.content.pm.PackageManager;
+import android.os.Handler;
 import android.util.Log;
 import android.widget.Toast;
 
@@ -21,13 +23,21 @@ import com.example.imagesender.enums.ServiceEnum;
 import java.nio.charset.StandardCharsets;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 
 public class ImageSenderGattCallback extends BluetoothGattCallback {
 
     private Context context;
-
-    public ImageSenderGattCallback(Context context) {
+    private Handler mHandler;
+    private BiConsumer<BluetoothDevice, String> mConnectionResultConsumer;
+    public ImageSenderGattCallback(Context context, Handler mHandler, BiConsumer<BluetoothDevice, String>consumer) {
         this.context = context;
+        this.mHandler = mHandler;
+        this.mConnectionResultConsumer = consumer;
+
+
+
     }
 
     @Override
@@ -37,16 +47,25 @@ public class ImageSenderGattCallback extends BluetoothGattCallback {
             return;
         }
         super.onConnectionStateChange(gatt, status, newState);
+        BluetoothDevice device = gatt.getDevice();
         if (status == BluetoothGatt.GATT_SUCCESS) {
             if (newState == BluetoothProfile.STATE_CONNECTED) {
-                Log.i("TAG", "Connected to GATT server.");
-                Objects.requireNonNull(CustomBluetoothManager.getInstance()).setGatt(gatt);
+                CustomBluetoothManager.getInstance().setGatt(gatt);
+                mHandler.post(() ->Toast.makeText(context, "Connected to GATT server.", Toast.LENGTH_SHORT).show());
                 gatt.discoverServices();
+                mConnectionResultConsumer.accept(device,"Connected");
             } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
                 Log.i("TAG", "Disconnected from GATT server.");
+                if(Objects.requireNonNull(CustomBluetoothManager.getInstance()).getGatt() != null) {
+                    CustomBluetoothManager.getInstance().getGatt().close();
+                }
+                CustomBluetoothManager.getInstance().setGatt(null);
+                mConnectionResultConsumer.accept(device, "Disconnected");
             }
         } else {
             Log.w("TAG", "Connection state change error: " + status);
+            mHandler.post(() ->Toast.makeText(context, "Connection failed Error code:"+status, Toast.LENGTH_SHORT).show());
+            mConnectionResultConsumer.accept(device,"Connection error " + status);
         }
     }
 
@@ -59,6 +78,7 @@ public class ImageSenderGattCallback extends BluetoothGattCallback {
         }
         UUID uuid = UUID.fromString(ServiceEnum.NUS_SERVICE_UUID.value);
         if (status == BluetoothGatt.GATT_SUCCESS) {
+            gatt.requestConnectionPriority(BluetoothGatt.CONNECTION_PRIORITY_HIGH);
             BluetoothGattService nusService = gatt.getService(uuid);
             if (nusService != null) {
                 BluetoothGattCharacteristic rxCharacteristic = nusService.getCharacteristic(uuid);

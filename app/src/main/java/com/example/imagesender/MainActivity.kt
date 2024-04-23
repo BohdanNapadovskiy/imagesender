@@ -1,193 +1,137 @@
-package com.example.imagesender;
+package com.example.imagesender
 
-import android.bluetooth.BluetoothAdapter;
-import android.bluetooth.BluetoothDevice;
-import android.bluetooth.BluetoothGatt;
-import android.bluetooth.BluetoothManager;
-import android.content.Context;
-import android.content.Intent;
-import android.content.pm.PackageManager;
-import android.graphics.Bitmap;
-import android.graphics.drawable.BitmapDrawable;
-import android.os.Build;
-import android.os.Bundle;
-import android.widget.Button;
-import android.widget.ImageView;
-import android.widget.TextView;
-import android.widget.Toast;
+import android.Manifest
+import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothManager
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.graphics.drawable.BitmapDrawable
+import android.net.Uri
+import android.os.Bundle
+import android.view.View
+import android.widget.Button
+import android.widget.ImageView
+import android.widget.TextView
+import android.widget.Toast
+import androidx.activity.result.ActivityResultLauncher
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AppCompatActivity
+import com.example.imagesender.activity.ImageSelectorActivity
+import com.example.imagesender.bluetooth.BluetoothDeviceSelectionActivity
+import com.example.imagesender.bluetooth.BluetoothNUSFileSender
+import com.example.imagesender.bluetooth.CustomBluetoothManager
+import com.example.imagesender.bluetooth.CustomBluetoothManager.Companion.instance
+import com.example.imagesender.permisssion.PermissionManager
+import com.example.imagesender.utils.ImageUtils
+import com.example.imagesender.utils.network.HttpsServerUtil
 
-import androidx.activity.result.ActivityResultLauncher;
-import androidx.activity.result.contract.ActivityResultContracts;
-import androidx.annotation.NonNull;
-import androidx.annotation.RequiresApi;
-import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.app.ActivityCompat;
-import androidx.core.content.ContextCompat;
-
-import android.Manifest;
-
-import com.example.imagesender.bluetooth.BluetoothDeviceSelectionActivity;
-import com.example.imagesender.activity.ImageSelectorActivity;
-import com.example.imagesender.bluetooth.CustomBluetoothManager;
-import com.example.imagesender.permisssion.PermissionManager;
-import com.example.imagesender.utils.ImageUtils;
-import com.example.imagesender.bluetooth.BluetoothNUSFileSender;
-import com.example.imagesender.utils.network.HttpsServerUtil;
-
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-
-public class MainActivity extends AppCompatActivity {
-    private CustomBluetoothManager customBluetoothManager;
-
-    private Button buttonSendImage;
-    private ImageUtils imageUtils;
-    private HttpsServerUtil serverUtil;
-    private ImageView mImageView;
-    private PermissionManager permissionManager;
-    private BluetoothAdapter bluetoothAdapter;
-    private ActivityResultLauncher<String> mGetContent;
-    private ActivityResultLauncher<Intent> intentContent;
-    private static final int PICK_IMAGE_REQUEST = 1;
-    private static final int REQUEST_BLUETOOTH_CONNECT = 101;
-    private static final int PERMISSIONS_REQUEST_CODE = 100;
-    private TextView textViewPath;
-    private BluetoothNUSFileSender nusFileSender;
-    private String deviceName;
-    private String deviceAddress;
-    private String[] permissions = {
+class MainActivity : AppCompatActivity() {
+    private var customBluetoothManager: CustomBluetoothManager? = null
+    private val buttonSendImage: Button? = null
+    private var imageUtils: ImageUtils? = null
+    private var serverUtil: HttpsServerUtil? = null
+    private var mImageView: ImageView? = null
+    private var permissionManager: PermissionManager? = null
+    private var bluetoothAdapter: BluetoothAdapter? = null
+    private var mGetContent: ActivityResultLauncher<String>? = null
+    private val intentContent: ActivityResultLauncher<Intent>? = null
+    private val textViewPath: TextView? = null
+    private val nusFileSender: BluetoothNUSFileSender? = null
+    private var deviceName: String? = null
+    private var deviceAddress: String? = null
+    private val permissions = arrayOf<String?>(
             Manifest.permission.BLUETOOTH_SCAN,
             Manifest.permission.BLUETOOTH_CONNECT,
             Manifest.permission.ACCESS_FINE_LOCATION
-    };
+    )
 
-
-    @Override
-    protected void onCreate(Bundle savedInstanceState) {
-        customBluetoothManager = CustomBluetoothManager.getInstance();
-        super.onCreate(savedInstanceState);
-        imageUtils = new ImageUtils(this);
-        serverUtil = new HttpsServerUtil(this);
-        permissionManager = new PermissionManager(this, PERMISSIONS_REQUEST_CODE);
-        setContentView(R.layout.activity_main);
-        initializeBluetooth();
-        Intent intent = getIntent();
+    override fun onCreate(savedInstanceState: Bundle?) {
+        customBluetoothManager = instance
+        super.onCreate(savedInstanceState)
+        imageUtils = ImageUtils(this)
+        serverUtil = HttpsServerUtil(this)
+        permissionManager = PermissionManager(this, PERMISSIONS_REQUEST_CODE)
+        setContentView(R.layout.activity_main)
+        initializeBluetooth()
+        val intent = intent
         if (intent != null) {
-            deviceName = (intent.getStringExtra("device_name") == null) ?
-                    "" : intent.getStringExtra("device_name") ;
-            deviceAddress = (intent.getStringExtra("device_address")== null) ?
-                    "" : intent.getStringExtra("device_address") ;
-            String status = (intent.getStringExtra("status")) == null ?
-                    "" : intent.getStringExtra("status") ;
-            TextView statusTextView = findViewById(R.id.status_text_view); // Assuming you have a TextView for this
-            statusTextView.setText("Device: " + deviceName + "\nAddress: " + deviceAddress+"\nStatus: " + status);
+            deviceName = if (intent.getStringExtra("device_name") == null) "" else intent.getStringExtra("device_name")
+            deviceAddress = if (intent.getStringExtra("device_address") == null) "" else intent.getStringExtra("device_address")
+            val status = if (intent.getStringExtra("status") == null) "" else intent.getStringExtra("status")!!
+            val statusTextView = findViewById<TextView>(R.id.status_text_view) // Assuming you have a TextView for this
+            statusTextView.text = "Device: $deviceName\nAddress: $deviceAddress\nStatus: $status"
         }
-
-
-        findViewById(R.id.button_select_image).setOnClickListener(view -> {
-            startActivity(new Intent(MainActivity.this, ImageSelectorActivity.class));
-        });
-        mImageView = findViewById(R.id.image_view_selected);
-        mGetContent = registerForActivityResult(new ActivityResultContracts.GetContent(), uri -> {
+        findViewById<View>(R.id.button_select_image).setOnClickListener { view: View? -> startActivity(Intent(this@MainActivity, ImageSelectorActivity::class.java)) }
+        mImageView = findViewById(R.id.image_view_selected)
+        mGetContent = registerForActivityResult<String, Uri>(ActivityResultContracts.GetContent()) { uri: Uri? ->
             if (uri != null) {
-                mImageView.setImageURI(uri);
+                mImageView!!.setImageURI(uri)
             }
-        });
-
-
-        findViewById(R.id.button_select_image).setOnClickListener(v -> mGetContent.launch("image/*"));
-        mImageView = findViewById(R.id.image_view_selected);
-
-        findViewById(R.id.button_connect_server).setOnClickListener(view -> serverUtil.connectToHTTPSServer());
-
-        findViewById(R.id.button_scan_bluetooth).setOnClickListener(view ->
-                startActivity(new Intent(MainActivity.this, BluetoothDeviceSelectionActivity.class)));
-
-        findViewById(R.id.button_send_image)
-                .setOnClickListener(view -> sendImageByBluetooth());
+        }
+        findViewById<View>(R.id.button_select_image).setOnClickListener { v: View? -> mGetContent!!.launch("image/*") }
+        mImageView = findViewById(R.id.image_view_selected)
+        findViewById<View>(R.id.button_connect_server).setOnClickListener { view: View? -> serverUtil!!.connectToHTTPSServer() }
+        findViewById<View>(R.id.button_scan_bluetooth).setOnClickListener { view: View? -> startActivity(Intent(this@MainActivity, BluetoothDeviceSelectionActivity::class.java)) }
+        findViewById<View>(R.id.button_send_image)
+                .setOnClickListener { view: View? -> sendImageByBluetooth() }
     }
 
-    private void sendImageByBluetooth() {
-        if (mImageView.getDrawable() != null) {
-            if (serverUtil.isNetworkConnected(this)) {
-                if (deviceAddress !=null) {
-                    sendFile();
+    private fun sendImageByBluetooth() {
+        if (mImageView!!.getDrawable() != null) {
+            if (serverUtil!!.isNetworkConnected(this)) {
+                if (deviceAddress != null) {
+                    sendFile()
                 } else {
-                    Toast.makeText(MainActivity.this, "Bluetooth device not selected!", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(this@MainActivity, "Bluetooth device not selected!", Toast.LENGTH_SHORT).show()
                 }
             } else {
-                Toast.makeText(MainActivity.this, "No internet connection!", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this@MainActivity, "No internet connection!", Toast.LENGTH_SHORT).show()
             }
         } else {
-            Toast.makeText(MainActivity.this, "No image selected!", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this@MainActivity, "No image selected!", Toast.LENGTH_SHORT).show()
         }
     }
 
-    private void sendFile() {
-        BluetoothGatt gatt = CustomBluetoothManager.getInstance().getGatt();
-        BitmapDrawable drawable = (BitmapDrawable) mImageView.getDrawable();
-        File file = saveBitmapToCache(drawable.getBitmap());
-        String imageBase64 = imageUtils.pmgFileToBase64(file);
-        String dz38Data = serverUtil.sendBase64ToServer(imageBase64);
+    private fun sendFile() {
+        val drawable = mImageView!!.getDrawable() as BitmapDrawable
+        val imageBase64 = imageUtils!!.bitmapToBase64(drawable.bitmap)
+        val dz38Data = serverUtil!!.sendBase64ToServer(imageBase64)
         if (dz38Data != null) {
-            File tmpFile = imageUtils.base64ToPng(dz38Data);
-            BluetoothNUSFileSender nusFileSender = new BluetoothNUSFileSender(this);
-            nusFileSender.sendFile(tmpFile);
+            val tmpFile = imageUtils!!.base64ToPng(dz38Data)
+            val nusFileSender = BluetoothNUSFileSender(this)
+            nusFileSender.sendFile(tmpFile)
         } else {
-            Toast.makeText(MainActivity.this, "Empty result from https server", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this@MainActivity, "Empty result from https server", Toast.LENGTH_SHORT).show()
         }
     }
 
-
-
-    private void initializeBluetooth() {
-        if (!permissionManager.hasPermission(Manifest.permission.BLUETOOTH_SCAN) ||
-                !permissionManager.hasPermission(Manifest.permission.BLUETOOTH_CONNECT) ||
-                !permissionManager.hasPermission(Manifest.permission.ACCESS_FINE_LOCATION)) {
-            permissionManager.requestPermissions(permissions);
+    private fun initializeBluetooth() {
+        if (!permissionManager!!.hasPermission(Manifest.permission.BLUETOOTH_SCAN) ||
+                !permissionManager!!.hasPermission(Manifest.permission.BLUETOOTH_CONNECT) ||
+                !permissionManager!!.hasPermission(Manifest.permission.ACCESS_FINE_LOCATION)) {
+            permissionManager!!.requestPermissions(permissions)
         } else {
-            BluetoothManager bluetoothManager = (BluetoothManager) getSystemService(Context.BLUETOOTH_SERVICE);
-            bluetoothAdapter = bluetoothManager.getAdapter();
+            val bluetoothManager = getSystemService(BLUETOOTH_SERVICE) as BluetoothManager
+            bluetoothAdapter = bluetoothManager.adapter
         }
     }
 
-    @Override
-    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == REQUEST_BLUETOOTH_CONNECT) {
-            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+            if (grantResults.size > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 // Permission was granted, continue with Bluetooth operations.
-                initializeBluetooth();
+                initializeBluetooth()
             } else {
                 // Permission was denied. Inform the user that the permission is necessary.
-                Toast.makeText(this, "Bluetooth permission is necessary to connect to devices.", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, "Bluetooth permission is necessary to connect to devices.", Toast.LENGTH_SHORT).show()
             }
         }
     }
 
-    public File saveBitmapToCache(Bitmap bitmap) {
-        File cachePath = new File(this.getCacheDir(), "images");
-        if (!cachePath.exists()) cachePath.mkdirs(); // Make sure the directory exists
-        File file = new File(cachePath, "temp_image.png");
-        FileOutputStream outputStream = null;
-        try {
-            outputStream = new FileOutputStream(file);
-            bitmap.compress(Bitmap.CompressFormat.PNG, 100, outputStream);
-        } catch (IOException e) {
-            e.printStackTrace();
-        } finally {
-            if (outputStream != null) {
-                try {
-                    outputStream.flush();
-                    outputStream.close();
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-            }
-        }
-        return file;
+    companion object {
+        private const val PICK_IMAGE_REQUEST = 1
+        private const val REQUEST_BLUETOOTH_CONNECT = 101
+        private const val PERMISSIONS_REQUEST_CODE = 100
     }
-
-
 }

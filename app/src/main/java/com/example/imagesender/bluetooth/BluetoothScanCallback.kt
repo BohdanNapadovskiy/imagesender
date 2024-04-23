@@ -9,7 +9,6 @@ import android.content.pm.PackageManager
 import android.util.Log
 import android.widget.ArrayAdapter
 import androidx.core.app.ActivityCompat
-import com.example.imagesender.permisssion.PermissionManager
 
 class BluetoothScanCallback(private val mArrayAdapter: ArrayAdapter<String>, private val mDevices: MutableList<BluetoothDevice>,
                             private val context: Context) : ScanCallback() {
@@ -34,3 +33,5 @@ class BluetoothScanCallback(private val mArrayAdapter: ArrayAdapter<String>, pri
         Log.e("TAG", "BLE Scan Failed with code $errorCode")
     }
 }
+
+

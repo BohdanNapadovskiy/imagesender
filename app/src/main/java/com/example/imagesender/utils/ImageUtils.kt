@@ -2,6 +2,7 @@ package com.example.imagesender.utils
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.service.controls.ControlsProviderService
 import android.util.Base64
 import android.util.Log
 import android.widget.Toast
@@ -10,13 +11,46 @@ import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
+import java.util.concurrent.Callable
+import java.util.concurrent.ExecutionException
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Future
 
 class ImageUtils(var context: Context) {
 
 
-    fun pmgFileToBase64(file: File):String {
-        val bytes = file.readBytes()
-        return Base64.encodeToString(bytes, Base64.DEFAULT)
+    fun pngFileToBase64(bitmap:Bitmap): String? {
+        val executorService: ExecutorService = java.util.concurrent.Executors.newSingleThreadExecutor();
+        val futureString: Future<String> = executorService.submit(Callable {
+            val file = saveBitmapToCache(bitmap)
+            val bytes = file.readBytes()
+            return@Callable Base64.encodeToString(bytes, Base64.DEFAULT)
+        })
+        return getResultFromFutureString(futureString)
+
+    }
+
+    private fun saveBitmapToCache(bitmap: Bitmap): File {
+        val cachePath = File(context.cacheDir, "images")
+        if (!cachePath.exists()) cachePath.mkdirs() // Make sure the directory exists
+        val file = File(cachePath, "temp_image.png")
+        var outputStream: FileOutputStream? = null
+        try {
+            outputStream = FileOutputStream(file)
+            bitmap.compress(Bitmap.CompressFormat.PNG, 100, outputStream)
+        } catch (e: IOException) {
+            e.printStackTrace()
+        } finally {
+            if (outputStream != null) {
+                try {
+                    outputStream.flush()
+                    outputStream.close()
+                } catch (e: IOException) {
+                    e.printStackTrace()
+                }
+            }
+        }
+        return file
     }
 
 
@@ -48,18 +82,15 @@ class ImageUtils(var context: Context) {
     }
 
 
-    fun convertBase64ToImage(context: Context, base64String: String?, fileName: String): String? {
-        val decodedBytes = Base64.decode(base64String, Base64.DEFAULT)
-        val newFileName = "_$fileName"
-        var filePath: String? = null
+    private fun getResultFromFutureString(future: Future<String>): String? {
+        var result: String? = null
         try {
-            context.openFileOutput(newFileName, Context.MODE_PRIVATE).use { outputStream ->
-                outputStream.write(decodedBytes)
-                filePath = context.getFileStreamPath(newFileName).absolutePath
-            }
-        } catch (e: IOException) {
-            Log.i(Constraints.TAG, "Error while decoding and storing the image: " + e.message)
+            result = future.get()
+        } catch (e: ExecutionException) {
+            Log.e(ControlsProviderService.TAG, "Error getting result from server")
+        } catch (e: InterruptedException) {
+            Log.e(ControlsProviderService.TAG, "Error getting result from server")
         }
-        return filePath
+        return result
     }
 }
